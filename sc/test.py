@@ -120,3 +120,86 @@ import maya.mel as mel
 mel.eval('texNormalProjection 1 1 "" ;')
 #展開
 #cmds.u3dUnfold(ite=1, p=0, bi=1, tf=1, ms=128, rs=0)
+
+
+
+##境界エッジを判定する
+import maya.cmds as cmds
+
+def is_boundary_edge(edge):
+    # edgeの両端の頂点を取得
+    faces = cmds.polyInfo(edge, edgeToFace=True)
+    faces = faces[0].split()[2:]
+    print(faces)
+    if len(faces) == 1:
+        print("boundary")
+        return True
+    else:
+        print("not boundary")
+        return False
+        
+# 選択しているエッジを取得
+selected_edges = cmds.ls(selection=True, flatten=True)
+
+if selected_edges:
+    for edge in selected_edges:
+        if is_boundary_edge(edge):
+            print(f"{edge} は境界エッジです。")
+        else:
+            print(f"{edge} は境界エッジではありません。")
+else:
+    print("エッジが選択されていません。")
+
+# edgeの選択
+from maya import cmds
+
+def is_border_edge(edge):
+    face = cmds.ls(cmds.polyListComponentConversion(edge, tf=True), fl=True)
+    return len(face) == 1
+    
+def is_seam_edge(edge):
+    uv = cmds.ls(cmds.polyListComponentConversion(edge, tuv=True), fl=True)
+    return len(uv) or is_border_edge(edge)
+    
+ def get_seam_edges(obj):
+     seam_edges = []
+     num_edge = cmds.polyEvaluate(obj, edge=True)
+     for edge_num in range(num_edge):
+         edge = '{}.e[{}]'.format(obj, edge_num)
+         if is_seam_edge(edge):
+             seam_edges.append(edge)
+     return seam_edges
+
+
+
+texture_size = 2048
+desired_Tex_density = 10.24
+def get_texel_density(faces, size= texture_size):
+    ws_area = 0.0
+    uv_area = 0.0
+    for face in faces:
+        ws_area += face.getArea(space='world')
+        #ws_area = ws_area + face.getArea(space = "world")
+    
+        uv_area += face.getUVArea() # By default I hope it picks the current uv set
+
+    # Get the square root of the area
+    ws_area = math.sqrt(ws_area)
+    uv_area = math.sqrt(uv_area)
+
+    px_area = uv_area * size
+    texel_density = (px_area / ws_area)
+    return texel_density
+
+
+
+from maya import cmds
+obj = cmds.ls(selection=True, flatten=True)
+print(obj)
+uv = cmds.polyListComponentConversion( obj, toUV = True )
+uv = cmds.ls(uv, flatten=True)
+print(uv)
+for uv_face in uv:
+    print(uv_face)
+    a = cmds.polyEvaluate( uv_face, boundingBox=True)
+    print(a)
