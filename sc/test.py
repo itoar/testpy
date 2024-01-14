@@ -203,3 +203,51 @@ for uv_face in uv:
     print(uv_face)
     a = cmds.polyEvaluate( uv_face, boundingBox=True)
     print(a)
+
+
+
+
+MayaのPythonスクリプトで、指定された三次元の点から最も近い頂点を選択するスクリプトを以下に示します。このスクリプトは、Maya APIのpointPosition関数を使用してオブジェクトの頂点座標を取得し、与えられた点との距離を計算して最も近い頂点を選択します。
+
+python
+Copy code
+import maya.cmds as cmds
+import maya.api.OpenMaya as om
+
+def get_closest_vertex(target_point):
+    # 選択されたオブジェクトを取得
+    selected_objects = cmds.ls(selection=True, dag=True, shapes=True)
+
+    if not selected_objects:
+        cmds.warning("Please select a 3D object.")
+        return
+
+    closest_vertex = None
+    min_distance = float('inf')
+
+    # ターゲット座標をMPointに変換
+    target_mpoint = om.MPoint(target_point[0], target_point[1], target_point[2])
+
+    for obj in selected_objects:
+        # オブジェクトの頂点座標を取得
+        vtx_iter = om.MItMeshVertex(obj)
+        while not vtx_iter.isDone():
+            vertex_position = vtx_iter.position(om.MSpace.kWorld)
+            distance = target_mpoint.distanceTo(vertex_position)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_vertex = vtx_iter.index()
+
+            vtx_iter.next()
+
+    if closest_vertex is not None:
+        cmds.select("{}.vtx[{}]".format(obj, closest_vertex))
+        print("Closest vertex selected: {}".format(closest_vertex))
+    else:
+        cmds.warning("No vertices found in the selected objects.")
+
+# 例: (x, y, z) 座標の点を指定して最も近い頂点を選択
+target_point = (1.0, 2.0, 3.0)
+get_closest_vertex(target_point)
+
