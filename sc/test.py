@@ -294,4 +294,6 @@ def select_v_to_edge(v_list, obj):
 
 selected_vert = cmds.ls(selection=True, flatten=True)
 find_connected_edge_from_vert(selected_vert, 100)
-    
+
+
+This is develop
