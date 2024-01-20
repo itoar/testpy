@@ -297,3 +297,99 @@ find_connected_edge_from_vert(selected_vert, 100)
 
 
 This is develop
+
+
+import maya.cmds as cmds
+import numpy as np
+import random
+
+def toFlatten(components):
+    return cmds.ls(components, fl=True, l=True)
+
+def calc_vec_from_pos2pos(pos1, pos2):
+    vector = np.array([float(pos1[0]) - float(pos2[0]), float(pos1[1]) - float(pos2[1]), float(pos1[2]) - float(pos2[2]) ])
+    vec_len = np.linalg.norm(vector)
+    vec_norm = vector / vec_len
+    return vec_norm
+    
+
+def vert_choice(vert_list, v_base, v_pre):
+    pos_base = cmds.xform(v_base, query=True, worldSpace=True, translation=True)
+    
+    #次の候補点は前回の候補点からベクトルが平行なモノを選ぶ
+    pos_pre = cmds.xform(v_pre, query=True, worldSpace=True, translation=True)
+    vec_norm_base = calc_vec_from_pos2pos(pos_base, pos_pre)
+    max_inner = -1.0
+    index = 0
+    for i in range(len(vert_list)):
+        pos_v = cmds.xform(vert_list[i], query=True, worldSpace=True, translation=True)
+        vec = calc_vec_from_pos2pos(pos_v, pos_base)
+        inner = np.dot(vec, vec_norm_base)
+        if inner >= max_inner:
+            max_inner = inner
+            index = i
+    return vert_list[index]
+
+#選択した頂点と隣接するエッジを選択
+def find_adjacent_edges(vert, prev_vert):
+    # エッジを含む頂点を取得
+    connected_edges = toFlatten(cmds.polyListComponentConversion(vert, toEdge=True))
+    connected_verts = toFlatten(cmds.polyListComponentConversion(connected_edges, toVertex=True))
+    ban_list = [toFlatten(vert)[0], toFlatten(prev_vert)[0]]
+    connected_verts = [elem for elem in connected_verts if elem not in ban_list]
+    if ban_list[0] == ban_list[1]:
+        choiced_vert = random.choice(connected_verts)
+    else:
+        choiced_vert = vert_choice(connected_verts, ban_list[0], ban_list[1])        
+    return choiced_vert
+    
+
+def find_connected_edge_from_vert(vert, num):
+
+    v_list=[]
+    v_list.append(toFlatten(vert)[0])
+    for i in range(num):        
+        if i == 0:
+            v_next = find_adjacent_edges(v_list[-1], v_list[-1])
+        else:           
+            v_next = find_adjacent_edges(v_list[-1], v_list[-2])
+        if v_next in v_list:
+            v_list.append(v_next)
+            print("break")
+            break
+        v_list.append(v_next)
+
+    object_name = vert[0].split('.')[0]
+    select_v_to_edge(v_list, object_name)
+ 
+def find_connected_edge_from_edge(edge, num):
+    vert_from_edge = toFlatten(cmds.polyListComponentConversion(edge, toVertex=True))
+    vert_from_edge = toFlatten(vert_from_edge)
+    v_list=[]
+    v_list.append(toFlatten(vert_from_edge[0])[0])
+    v_list.append(toFlatten(vert_from_edge[1])[0])
+    print(v_list)
+
+    for i in range(num):        
+        v_next = find_adjacent_edges(v_list[-1], v_list[-2])
+        if v_next in v_list:
+            v_list.append(v_next)
+            print("break")
+            break
+        v_list.append(v_next)
+
+    object_name = vert_from_edge[0].split('.')[0]
+    select_v_to_edge(v_list, object_name) 
+ 
+def select_v_to_edge(v_list, obj):
+    cmds.select( clear=True )
+    for i in range(len(v_list) - 1):
+        index_0 = v_list[i].split('.')[1].split('[')[-1].rstrip(']')
+        index_1 = v_list[i+1].split('.')[1].split('[')[-1].rstrip(']')
+        edge = cmds.polySelect( obj, shortestEdgePath=(int(index_0), int(index_1) ) )
+    edges = cmds.ls(selection=True, flatten=True)
+
+
+selected_vert = cmds.ls(selection=True, flatten=True)
+#find_connected_edge_from_vert(selected_vert, 100)
+find_connected_edge_from_edge(selected_vert, 100)
