@@ -393,3 +393,47 @@ def select_v_to_edge(v_list, obj):
 selected_vert = cmds.ls(selection=True, flatten=True)
 #find_connected_edge_from_vert(selected_vert, 100)
 find_connected_edge_from_edge(selected_vert, 100)
+
+
+
+import maya.cmds as cmds
+
+# 選択されているメッシュを取得
+selected_meshes = cmds.ls(selection=True, type='transform')
+
+# 境界エッジを選択する関数
+def select_border_edges(mesh):
+    # メッシュの全エッジを取得
+    all_edges = cmds.ls(cmds.polyListComponentConversion(mesh, toEdge=True), flatten=True)
+    
+    # 境界エッジを格納するリスト
+    border_edges = []
+
+    # 各エッジが境界エッジかどうかを確認
+    for edge in all_edges:
+        info = cmds.polyInfo(edge, edgeToFace=True)
+        if info and len(info[0].split(":")[1].split()) == 1:  # 境界エッジは一つの面にしか接続していない
+            border_edges.append(edge)
+
+    # 境界エッジを選択
+    if border_edges:
+        cmds.select(border_edges)
+    else:
+        print("No border edges found.")
+
+# 選択されている各メッシュに対して境界エッジを選択
+for mesh in selected_meshes:
+    select_border_edges(mesh)
+
+
+
+import maya.cmds as cmds
+
+def getNotBoundaryEdgesFromBoundaryVertex(vert):
+    all_edges = cmds.ls(cmds.polyListComponentConversion(vert, toEdge=True), flatten=True)
+    not_boundary_edges = []
+    for edge in all_edges:
+        info = cmds.polyInfo(edge, edgeToFace=True)
+        if info and len(info[0].split(":")[1].split()) != 1:
+            not_boundary_edges.append(edge)
+    return not_boundary_edges
