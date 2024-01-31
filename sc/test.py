@@ -437,3 +437,30 @@ def getNotBoundaryEdgesFromBoundaryVertex(vert):
         if info and len(info[0].split(":")[1].split()) != 1:
             not_boundary_edges.append(edge)
     return not_boundary_edges
+
+
+
+import maya.mel as mel
+
+mel.eval('ConvertSelectionToEdgePerimeter;')
+
+
+
+import maya.cmds as cmds
+
+def selectSideFace(obj):
+    faces = cmds.polyListComponentConversion(selected_objects, toFace=True)
+    faces = cmds.ls(faces, flatten=True)
+    faces_to_select = []    
+    for face in faces:
+        normal = cmds.polyInfo(face, fn=True)[0]
+        normal   = normal.split(' ')
+        if abs(float(normal[-2])) < 0.1:
+            faces_to_select.append(face)
+    
+    return faces_to_select
+
+selected_objects = cmds.ls(selection=True)
+side_faces = selectSideFace(selected_objects)
+cmds.select(side_faces)
+mel.eval('ConvertSelectionToEdgePerimeter;')
