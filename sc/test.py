@@ -464,3 +464,163 @@ selected_objects = cmds.ls(selection=True)
 side_faces = selectSideFace(selected_objects)
 cmds.select(side_faces)
 mel.eval('ConvertSelectionToEdgePerimeter;')
+
+
+import maya.cmds as cmds
+
+def getUVVertexPos():
+    # 選択されたUVを取得
+    selected_uvs = cmds.ls(selection=True, flatten=True)
+    # 選択されたUVを頂点に変換
+    uv_to_verts = cmds.polyListComponentConversion(selected_uvs, toUV=True)
+    # 変換された頂点をリスト化
+    vertices = cmds.ls(uv_to_verts, flatten=True)
+    # 各頂点の座標を取得して出力
+    vertex_positions = []
+    for vertex in vertices:
+        uv = cmds.polyEditUV(vertex, query=True)
+        vertex_positions.append(uv)
+    uv_vert = np.array(vertex_positions)
+    return uv_vert
+
+def getMaxEigenVec(vert):
+    
+    mean = np.mean(uv_vert, axis = 0)
+    P = uv_vert - mean    
+    l,v = np.linalg.eig( np.dot(P.T,P) )
+    return v[np.argmax(l)]
+    
+
+uv_vert = getUVVertexPos()
+eigen_max_vec = getMaxEigenVec(uv_vert)
+print(eigen_max_vec)
+
+
+import maya.cmds as cmds
+import math
+
+def getUVVertexPos(obj):
+    # 選択されたUVを取得
+    # 選択されたUVを頂点に変換
+    uv_to_verts = cmds.polyListComponentConversion(obj, toUV=True)
+    # 変換された頂点をリスト化
+    vertices = cmds.ls(uv_to_verts, flatten=True)
+    # 各頂点の座標を取得して出力
+    vertex_positions = []
+    for vertex in vertices:
+        uv = cmds.polyEditUV(vertex, query=True)
+        vertex_positions.append(uv)
+    uv_vert = np.array(vertex_positions)
+    return uv_vert
+
+def getMaxEigenVec(vert):
+    
+    mean = np.mean(vert, axis = 0)
+    P = vert - mean    
+    l,v = np.linalg.eig( np.dot(P.T,P) )
+    return v[np.argmax(l)]
+    
+def rotateUV(obj, angle):
+    uv_vert = getUVVertexPos(obj)
+    mean = np.mean(uv_vert, axis = 0)
+    uv_to_verts = cmds.polyListComponentConversion(obj, toUV=True)
+    vertices = cmds.ls(uv_to_verts, flatten=True)        
+    cmds.polyMoveUV( vertices, pvu=mean[0], pvv=mean[1], ra=angle )
+
+def alignUV():
+    obj = cmds.ls(selection=True, flatten=True)    
+    uv_vert = getUVVertexPos(obj)
+    eigen_max_vec = getMaxEigenVec(uv_vert)
+    print(eigen_max_vec)
+    theta = math.acos(eigen_max_vec[0])
+    theta = math.degrees(theta)
+    if eigen_max_vec[1] >= 0:
+        theta = theta
+    else:
+        theta = -1*theta
+        print(theta)
+    rotateUV(obj, theta)
+    
+alignUV()
+
+
+
+def getUVShellList():
+    sel = cmds.ls(sl=True)
+    
+    uvset = ''
+    UVs = []
+    shapes = cmds.listRelatives(sel[0])
+    selected = OM.MGlobal.getSelectionListByName(shapes[0])
+    node =  selected.getDependNode(0)
+    mesh = OM.MFnMesh(node)
+    num, shell_ids = mesh.getUvShellsIds(uvset)
+    u_list, v_list = mesh.getUVs()
+    
+    uvShells = []
+    for shell_num in range(num):
+        uvs = []
+        for idx, uvShell in enumerate(shell_ids):
+            if uvShell == shell_num:
+                centerUV = mesh.getClosestUVs(u_list[idx],v_list[idx])
+                uvs.append(centerUV[0])
+        uvShells.append(uvs)
+    
+    shell_list = []
+    list = []
+    for uv in uvShells:
+        list = []
+        for i in uv:
+            string = f"{sel[0]}.map[{i}]"
+            print(string)
+            list.append(string)
+        shell_list.append(list)
+    return shell_list
+
+list = getUVShellList()
+
+
+
+import maya.api.OpenMaya as OM
+import maya.cmds as cmds
+import maya.mel as mel
+from math import floor
+
+def getUVShellList():
+    sel = cmds.ls(sl=True)
+    
+    uvset = ''
+    UVs = []
+    shapes = cmds.listRelatives(sel[0])
+    selected = OM.MGlobal.getSelectionListByName(shapes[0])
+    node =  selected.getDependNode(0)
+    mesh = OM.MFnMesh(node)
+    num, shell_ids = mesh.getUvShellsIds(uvset)
+    u_list, v_list = mesh.getUVs()
+    
+    uvShells = []
+    for shell_num in range(num):
+        uvs = []
+        for idx, uvShell in enumerate(shell_ids):
+            if uvShell == shell_num:
+                centerUV = mesh.getClosestUVs(u_list[idx],v_list[idx])
+                uvs.append(centerUV[0])
+        uvShells.append(uvs)
+    
+    shell_list = []
+    list = []
+    for uv in uvShells:
+        list = []
+        for i in uv:
+            string = f"{sel[0]}.map[{i}]"
+            print(string)
+            list.append(string)
+        shell_list.append(list)
+    return shell_list
+
+list = getUVShellList()
+
+cmds.select(list[0])
+mel.eval('polySelectBorderShell 1;')
+mel.eval('setSelectMode components Components; selectType -smp 1 -sme 0 -smf 0 -smu 0 -pv 1 -pe 0 -pf 0 -puv 0; HideManipulators; ')
+mel.eval('performPolyPinSelectionUVOptions 0;'
