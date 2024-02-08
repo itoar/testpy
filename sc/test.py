@@ -624,3 +624,22 @@ cmds.select(list[0])
 mel.eval('polySelectBorderShell 1;')
 mel.eval('setSelectMode components Components; selectType -smp 1 -sme 0 -smf 0 -smu 0 -pv 1 -pe 0 -pf 0 -puv 0; HideManipulators; ')
 mel.eval('performPolyPinSelectionUVOptions 0;'
+
+import maya.api.OpenMaya as om
+
+# 選択されたフェイスのイテレータを取得
+selected_faces = om.MSelectionList()
+om.MGlobal.getActiveSelectionList(selected_faces)
+
+# 各フェイスのUVシェルを取得
+for face in selected_faces:
+  uv_shell = om.MFnMesh(face.getDagPath()).getUVShell(face.index())
+  print("フェイス " + str(face.index()) + " のUVシェル: " + uv_shell.name())
+
+# 選択されたフェイスのUVシェルのリストを取得
+selected_faces = cmds.ls(sl=True, flatten=True)
+uv_shells = cmds.polyUVSet(selected_faces, query=True, uvShell=True)
+
+# 各UVシェルの名前を出力
+for i in range(len(uv_shells)):
+  print("UVシェル " + str(i) + ": " + uv_shells[i])
