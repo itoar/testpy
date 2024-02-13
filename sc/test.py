@@ -643,3 +643,13 @@ uv_shells = cmds.polyUVSet(selected_faces, query=True, uvShell=True)
 # 各UVシェルの名前を出力
 for i in range(len(uv_shells)):
   print("UVシェル " + str(i) + ": " + uv_shells[i])
+
+mesh = o3d.geometry.TriangleMesh()
+np_vertices = v
+np_triangles = f
+
+mesh.vertices = o3d.utility.Vector3dVector(np_vertices)
+
+mesh.triangles = o3d.utility.Vector3iVector(np_triangles)
+mesh.compute_vertex_normals()
+o3d.visualization.draw_geometries([mesh],mesh_show_back_face=True)
