@@ -183,3 +183,39 @@ def getBindJointMatrix():
     # mel.eval("undo;")
     return mat_bind_list
 
+
+-----------------------------------------
+
+def get_bound_joints(mesh_name):
+    skin_cluster = cmds.ls(cmds.listHistory(mesh_name), type="skinCluster")
+    if skin_cluster:
+        bound_joints = cmds.skinCluster(skin_cluster[0], query=True, influence=True)
+        return bound_joints
+    else:
+        return []
+
+# Example usage:
+selected_mesh = cmds.ls(selection=True)
+if selected_mesh:
+    bound_joints = get_bound_joints(selected_mesh[0])
+    for i in bound_joints:
+        print(i)
+    cmds.select(bound_joints[0])
+
+
+def DuplicateForTarget():
+    obj = cmds.ls(selection=True)
+    mel.eval("Duplicate;")
+    cmds.select(obj)
+    mel.eval("ToggleVisibilityAndKeepSelection;")
+
+def getObjectVertices():
+    sll = om2.MGlobal.getActiveSelectionList()
+    mesh = om2.MFnMesh(sll.getDagPath(0))
+    x = mesh.getPoints()
+    list = np.array([])
+    for i, t in enumerate(x):
+        list = np.append(list, np.array([t[0], t[1], t[2]]))
+        print(i, " ", t[0], t[1], t[2])
+    list = np.reshape(list, (-1, 3))
+    return list
