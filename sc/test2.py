@@ -219,3 +219,20 @@ def getObjectVertices():
         print(i, " ", t[0], t[1], t[2])
     list = np.reshape(list, (-1, 3))
     return list
+
+def processWeight(K=2):
+    w = getSkinWeight()
+    list = np.array([])
+    is_first = True
+    for i in w:
+        ii = np.argsort(i)
+        i[ii[:-K]] = 0
+        res = 1.0 - np.sum(i)
+        i[ii[-K:]] += res/K
+        if is_first == True:
+            list = np.array(i)
+            is_first = False
+        else:
+            tmp_list = np.array(i)
+            list = np.vstack([list, tmp_list])
+    print(list)
