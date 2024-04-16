@@ -31,3 +31,35 @@ def conputeRigidBodyTransform(A, B, enable_scale = False):
         t = center_B - (R @ center_A)
         s = 1.0
     return R, s, t
+
+
+
+def create_joint_with_matrix(matrix, parent_joint=None):
+    # 新しいジョイントを作成
+    new_joint = cmds.joint()
+
+    # Maya APIを使用して新しいジョイントのワールドマトリックスを設定
+    m_matrix = om.MMatrix(matrix)
+    m_transform = om.MTransformationMatrix(m_matrix)
+    m_translation = m_transform.translation(om.MSpace.kWorld)
+    m_rotation = m_transform.rotation(asQuaternion=True)
+
+    # 新しいジョイントのトランスフォームノードを取得
+    joint_transform = cmds.listRelatives(new_joint, parent=True, path=True)[0]
+
+    # ワールドマトリックスを新しいジョイントのトランスフォームノードに適用
+    cmds.xform(joint_transform, translation=m_translation, rotation=m_rotation, worldSpace=True)
+
+    # 親ジョイントが指定されている場合は、新しいジョイントをその子に設定
+    if parent_joint:
+        cmds.parent(new_joint, parent_joint)
+
+    return new_joint
+
+# マトリックスを作成（例：単位行列）
+matrix = om.MMatrix()
+# 親ジョイントの名前を指定（必要な場合）
+parent_joint = "parent_joint_name"
+
+# 新しいジョイントを作成し、親ジョイントに設定
+created_joint = create_joint_with_matrix(matrix, parent_joint)
