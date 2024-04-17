@@ -63,3 +63,24 @@ parent_joint = "parent_joint_name"
 
 # 新しいジョイントを作成し、親ジョイントに設定
 created_joint = create_joint_with_matrix(matrix, parent_joint)
+
+
+def setJointRadius(name, joint_rad):
+    str = name + ".radius"
+    cmds.setAttr(str, joint_rad)
+
+def addSkinCluster(skinname, jointname):
+    str = "skinCluster -e -dr 4 -lw true -wt 0 -ai " + joint4 + " " + skinname + ";"
+    mel.eval(str)
+
+def getJointTransform(joint_name):
+    t = cmds.xform(joint_name, query=True, translation=True, worldSpace=True)
+    r = cmds.xform(joint_name, query=True, rotation=True, worldSpace=True)
+    s = cmds.xform(joint_name, query=True, scale=True, worldSpace=True)
+    return t, r, s
+
+def setJointTransform(joint_name, t, r):
+    cmds.xform(joint_name, translation=t, rotation=r, worldSpace=True)
+
+def RenameJoint(joint_name, name):
+    cmds.rename(joint_name, name)
