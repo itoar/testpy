@@ -197,3 +197,19 @@ def computeNormal(center, PairList):
 #print("end")
 vert = getObjectVertices()
 getFaceIdList(vert)
+
+
+
+coff_mat = []
+for j in range(JNum):
+    tmp = []
+    for i in alpha:
+        tmp.extend([i,i,i])
+    coff_mat.append(tmp)
+coff_mat = np.array(coff_mat)
+print(coff_mat)
+
+A = 100.0*np.ones_like(coff_mat)
+print(A)
+B = coff_mat * A
+print(B)
