@@ -213,3 +213,47 @@ A = 100.0*np.ones_like(coff_mat)
 print(A)
 B = coff_mat * A
 print(B)
+
+def rotation_to_matrix(rotation):
+    rx = math.radians(rotation[0])
+    ry = math.radians(rotation[1])
+    rz = math.radians(rotation[2])
+
+    cos_rx = math.cos(rx)
+    sin_rx = math.sin(rx)
+    cos_ry = math.cos(ry)
+    sin_ry = math.sin(ry)
+    cos_rz = math.cos(rz)
+    sin_rz = math.sin(rz)
+
+    matrix = [
+        [cos_ry * cos_rz, cos_rz * sin_rx * sin_ry - cos_rx * sin_rz, sin_rx * sin_rz + cos_rx * cos_rz * sin_ry, 0],
+        [cos_ry * sin_rz, cos_rx * cos_rz + sin_rx * sin_ry * sin_rz, cos_rx * sin_ry * sin_rz - cos_rz * sin_rx, 0],
+        [-sin_ry, cos_ry * sin_rx, cos_rx * cos_ry, 0],
+        [0, 0, 0, 1]
+    ]
+
+    return matrix
+
+def get_combined_local_matrix(joint_name):
+    joint_names = []
+    current_joint = joint_name
+    while current_joint:
+        joint_names.append(current_joint)
+        current_joint = cmds.listRelatives(current_joint, parent=True)
+        if current_joint:
+            current_joint = current_joint[0]    
+    return joint_names
+
+hoge = get_combined_local_matrix(pjoint_name)
+rtmat = np.identity(4)
+
+for j in hoge:
+    rot = cmds.xform(j, query=True, rotation=True, ws=False)
+    rot_mat = np.array(rotation_to_matrix(rot))
+    rot_mat[3,:] = np.array([0.0,0.0,0.0,1.0])
+    rtmat = rot_mat @ rtmat
+rotate_mat = np.array([[0.5, 0.5, 0.0, 0.0],[-0.5, 0.5, 0.0, 0.0],[0.0, 0.0, 1.0, 0.0],[0.0, 0.0, 0.0, 1.0]])
+rotate_mat = np.linalg.inv(rtmat) @ rotate_mat
+
+cmds.xform(joint_name , matrix=rotate_mat.ravel(), worldSpace=True)
