@@ -257,3 +257,57 @@ rotate_mat = np.array([[0.5, 0.5, 0.0, 0.0],[-0.5, 0.5, 0.0, 0.0],[0.0, 0.0, 1.0
 rotate_mat = np.linalg.inv(rtmat) @ rotate_mat
 
 cmds.xform(joint_name , matrix=rotate_mat.ravel(), worldSpace=True)
+
+
+def calcRotation2Mat(rotation):
+    # オイラー角を作成
+    euler = om2.MEulerRotation(math.radians(rotation[0]), math.radians(rotation[1]), math.radians(rotation[2]), om2.MEulerRotation.kXYZ)
+    return np.array(euler.asMatrix()).reshape([4,4])
+
+def calcMat2Rotation(Mat):
+    util = om.MScriptUtil()
+    mat = om.MMatrix()
+    util.createMatrixFromList(Mat.ravel().tolist(), mat)
+    rot = om.MEulerRotation.decompose(mat, om.MEulerRotation.kXYZ)
+    return [math.degrees(rot.x), math.degrees(rot.y), math.degrees(rot.z)]
+
+def getJointOrient(joint_node):
+    x = cmds.getAttr(joint_node + ".jointOrientX")
+    y = cmds.getAttr(joint_node + ".jointOrientY")
+    z = cmds.getAttr(joint_node + ".jointOrientZ")
+    return [x, y, z]
+
+def calcJointMatrix(joint_node):
+    w_mat = getJointWorldMatrix(joint_node)
+
+    print("--------------")
+    print(f"{joint_node} world mat")
+    print(w_mat)
+    rotation = calcMat2Rotation(w_mat)
+    print("rotation")
+    print(rotation)
+    print("--------------")
+
+
+def setRotation(joint_node, rotation_input):
+    base_mat = getJointWorldMatrix(joint_node)
+    base_mat = base_mat.T
+    rotation_mat = calcRotation2Mat(rotation_input)
+
+    parent = cmds.listRelatives(joint_node, parent=True)
+    parent_mat = getJointWorldMatrix(parent)
+    parent_mat = parent_mat.T
+
+    joint_rot = getJointOrient(joint_node)
+    joint_rot_mat = calcRotation2Mat(joint_rot)
+    joint_rot_mat = joint_rot_mat[0:3,0:3]
+
+    parent_mat_rot = parent_mat[0:3,0:3]
+    rotation_mat = rotation_mat[0:3,0:3]
+    rot = rotation_mat @ joint_rot_mat @ parent_mat_rot
+
+    base_mat[0:3,0:3] = rot[0:3,0:3]
+
+
+    cmds.xform(joint_node, matrix=base_mat.ravel(), ws=True)
+
