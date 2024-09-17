@@ -73,3 +73,23 @@ plotBezier(B_param_1)
 plt.show()
 
 print(*(B_param.T[0]).T)
+
+
+
+---------------
+
+import maya.cmds as cmds
+import math
+
+def deleteLayer(layer_name):
+    cmds.delete(layer_name)
+    
+def createLayer(layer_name):
+    cmds.animLayer(layer_name, animCurves=True, aso=True, sel=True)
+    
+def createZeroLayer(layer_name):
+    createLayer(layer_name)
+    cmds.animLayer(layer_name, edit=True, preferred=True, selected=True)
+    for i in range(100):
+        val = 5
+        cmds.setKeyframe( at='translateY',v=val ,time=i )
