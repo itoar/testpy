@@ -143,12 +143,12 @@ public:
 
     //-----------------------------------------
     // Triplet配列からCSR形式へ変換する関数
-    // triplets: Tripletの配列、tripletCount: 配列の要素数
+    // triplets: Tripletの配列、triplet_count: 配列の要素数
     // ※ここでは重複エントリの処理は行わず、単純に各Tripletをそのまま格納します。
     //-----------------------------------------
-    void buildFromTriplets(const Triplet* triplets, int tripletCount) {
+    void buildFromTriplets(const Triplet* triplets, int triplet_count) {
         // まず、各行に含まれるエントリ数をカウント
-        mNonZeroNum = tripletCount;  // 重複がない場合、これがそのまま非ゼロ数となる
+        mNonZeroNum = triplet_count;  // 重複がない場合、これがそのまま非ゼロ数となる
         // 既存のメモリを解放（必要なら）
         delete[] mVal; delete[] mColIndex; delete[] mRowPtr;
         mVal = new T[mNonZeroNum];
@@ -161,8 +161,8 @@ public:
         }
 
         // 各Tripletについて、その行のエントリ数をカウント
-        for (int i = 0; i < tripletCount; ++i) {
-            int r = triplets[i].row;
+        for (int i = 0; i < triplet_count; ++i) {
+            int r = triplets[i].mRow;
             assert(r >= 0 && r < mRowNum);
             mRowPtr[r + 1]++;
         }
@@ -179,14 +179,91 @@ public:
         }
 
         // 各Tripletを対応する位置に配置
-        for (int i = 0; i < tripletCount; ++i) {
-            int r = triplets[i].row;
+        for (int i = 0; i < triplet_count; ++i) {
+            int r = triplets[i].mRow;
             int dest = next[r]++;
-            mVal[dest] = triplets[i].value;
-            mColIndex[dest] = triplets[i].col;
+            mVal[dest] = triplets[i].mValue;
+            mColIndex[dest] = triplets[i].mCol;
         }
         delete[] next;
     }
+
+  void buildFromTriplets(const Triplet* triplets, int triplet_count) {
+        // --- 1. 入力の Triplet 配列を動的配列 temp にコピー ---
+        Triplet* temp = new Triplet[triplet_count];
+        for (int i = 0; i < triplet_count; ++i) {
+            temp[i] = triplets[i];
+        }
+
+        // --- 2. temp 配列を (行, 列) の順でソート ---
+        std::sort(temp, temp + triplet_count, [](const Triplet &a, const Triplet &b) {
+            if (a.mRow != b.mRow)
+                return a.mRow < b.mRow;
+            return a.mCol < b.mCol;
+        });
+
+        // --- 3. 重複エントリを統合 ---
+        // 重複を足し合わせた結果を保持するための動的配列 merged を用意
+        Triplet* merged = new Triplet[triplet_count];
+        int merged_count = 0;
+        if (triplet_count > 0) {
+            merged[0] = temp[0];
+            merged_count = 1;
+            for (int i = 1; i < triplet_count; ++i) {
+                // 直前の要素と同じ行・列なら値を足し合わせる
+                if (temp[i].mRow == merged[merged_count - 1].mRow &&
+                    temp[i].mCol == merged[merged_count - 1].mCol) {
+                    merged[merged_count - 1].mValue += temp[i].mValue;
+                } else {
+                    merged[merged_count++] = temp[i];
+                }
+            }
+        }
+        delete[] temp; // 一時配列は不要になったので解放
+
+        // --- 4. CSR 形式への変換 ---
+        mNonZeroNum = merged_count;
+        // 既存のメモリがあれば解放し，新たに必要なサイズのメモリを確保
+        delete[] mVal;      
+        delete[] mColIndex; 
+        delete[] mRowPtr;
+        mVal = new T[mNonZeroNum];
+        mColIndex = new int[mNonZeroNum];
+        mRowPtr = new int[mRowNum + 1];
+
+        // mRowPtr をゼロで初期化
+        for (int i = 0; i <= mRowNum; i++) {
+            mRowPtr[i] = 0;
+        }
+        // 各行に含まれるエントリ数をカウント
+        for (int i = 0; i < merged_count; ++i) {
+            int r = merged[i].mRow;
+            assert(r >= 0 && r < mRowNum);
+            mRowPtr[r + 1]++;
+        }
+        // 累積和により各行の開始位置を決定
+        for (int i = 0; i < mRowNum; ++i) {
+            mRowPtr[i + 1] += mRowPtr[i];
+        }
+
+        // 各行の挿入位置を管理するための一時配列 next を用意
+        int* next = new int[mRowNum];
+        for (int i = 0; i < mRowNum; i++) {
+            next[i] = mRowPtr[i];
+        }
+        // merged 配列の各エントリを所定の位置に配置
+        for (int i = 0; i < merged_count; ++i) {
+            int r = merged[i].mRow;
+            int dest = next[r]++;
+            mVal[dest] = merged[i].mValue;
+            mColIndex[dest] = merged[i].mCol;
+        }
+        delete[] next;
+        delete[] merged;
+    }
+};
+
+
 };
 
 //-----------------------------------------
@@ -225,8 +302,8 @@ int main() {
         CSRMatrix<float>::Triplet(2, 0, 40),
         CSRMatrix<float>::Triplet(2, 2, 50)
     };
-    int tripletCount = sizeof(triplets) / sizeof(triplets[0]);
-    mat2.buildFromTriplets(triplets, tripletCount);
+    int triplet_count = sizeof(triplets) / sizeof(triplets[0]);
+    mat2.buildFromTriplets(triplets, triplet_count);
     std::printf("Tripletから構築したCSR行列:\n");
     mat2.printCSR();
 
