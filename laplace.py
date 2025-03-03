@@ -336,3 +336,73 @@ def initializeConstraintTool():
 
 # ツールの起動例
 initializeConstraintTool()
+
+
+
+///////////////////
+色付け
+
+
+import maya.api.OpenMaya as om
+import numpy as np
+
+def applyColorToMesh(u):
+    """
+    与えられたハーモニックフィールドの解 u（各頂点の値）を用いて、
+    メッシュの各頂点に色を適用する。
+    u の値は [u_min, u_max] を [0, 1] に正規化し、
+    0→青、0.5→白、1→赤 のグラデーションで色付けする例です。
+    """
+    dag = get_selected_mesh_dag()
+    if dag is None:
+        return
+
+    meshFn = om.MFnMesh(dag)
+    nVerts = meshFn.numVertices
+
+    # u の長さがメッシュの頂点数と一致しているか確認
+    if len(u) != nVerts:
+        om.MGlobal.displayError("解の長さが頂点数と一致しません")
+        return
+
+    # u の最小値・最大値を求めて正規化する
+    u_min = np.min(u)
+    u_max = np.max(u)
+    if abs(u_max - u_min) < 1e-6:
+        scale = 1.0
+    else:
+        scale = 1.0 / (u_max - u_min)
+
+    # MColorArray を作成して、各頂点の色を計算
+    colorArray = om.MColorArray()
+    for i in range(nVerts):
+        # 各頂点の u の値を [0,1] に正規化
+        norm_val = (u[i] - u_min) * scale
+        
+        # 例として、norm_val が 0 なら青 (0,0,1)、0.5 なら白 (1,1,1)、1 なら赤 (1,0,0) にマップする
+        if norm_val < 0.5:
+            # 青から白への補間
+            t = norm_val / 0.5
+            r = t
+            g = t
+            b = 1.0
+        else:
+            # 白から赤への補間
+            t = (norm_val - 0.5) / 0.5
+            r = 1.0
+            g = 1.0 - t
+            b = 1.0 - t
+
+        color = om.MColor((r, g, b, 1.0))
+        colorArray.append(color)
+    
+    # 全頂点のインデックス配列を作成
+    vertexIndices = om.MIntArray(range(nVerts))
+    
+    # MFnMesh.setVertexColors() を使って、頂点カラーを設定
+    meshFn.setVertexColors(colorArray, vertexIndices)
+    om.MGlobal.displayInfo("ハーモニックフィールドに基づく頂点カラーを適用しました")
+
+# 例: 既に u_solution にポアソン方程式の最小二乗解（ハーモニックフィールド）が求まっている場合
+# u_solution = solve_expanded_system()  # これは先ほどのコードで得られる
+# applyColorToMesh(u_solution)
