@@ -406,3 +406,159 @@ def applyColorToMesh(u):
 # 例: 既に u_solution にポアソン方程式の最小二乗解（ハーモニックフィールド）が求まっている場合
 # u_solution = solve_expanded_system()  # これは先ほどのコードで得られる
 # applyColorToMesh(u_solution)
+
+
+
+import maya.api.OpenMaya as om
+import maya.cmds as cmds
+import math
+
+def getSelectedEdges():
+    """
+    現在選択中のエッジコンポーネントと対応する MDagPath を取得する
+    """
+    selList = om.MGlobal.getActiveSelectionList()
+    edges = []
+    for i in range(selList.length()):
+        dagPath, comp = selList.getComponent(i)
+        # エッジコンポーネントかどうかをチェック
+        if comp.apiType() == om.MFn.kMeshEdgeComponent:
+            edges.append((dagPath, comp))
+    return edges
+
+def findClosestVertex(meshFn, candidatePoint):
+    """
+    candidatePoint に対して、メッシュ内の全頂点を走査し、
+    最も近い頂点のインデックスを返す。
+    """
+    itVert = om.MItMeshVertex(meshFn.object())
+    minDist = float('inf')
+    closestVertId = None
+    while not itVert.isDone():
+        pos = itVert.position(om.MSpace.kWorld)
+        dist = (pos - candidatePoint).length()
+        if dist < minDist:
+            minDist = dist
+            closestVertId = itVert.index()
+        itVert.next()
+    return closestVertId
+
+def generateConstraintsFromSelectedEdges(epsilon=0.05):
+    """
+    選択中のエッジの各エッジについて、
+    エッジの中点からオフセットされた候補点（正側 candidatePlus, 負側 candidateMinus）から
+    最も近い頂点を検索し、その頂点を含む面をひとつ選んで、
+    制約点を面IDとバリセンター座標として表現する。
+    
+    制約情報は辞書 { "faceId": faceId, "bary": (u,v,w), "value": ±1, "weight": 1.0 } としてリストで返す。
+    epsilon はオフセット量（シーンスケールに合わせて調整）。
+    """
+    constraints = []
+    selEdges = getSelectedEdges()
+    if not selEdges:
+        om.MGlobal.displayError("エッジが選択されていません")
+        return constraints
+
+    # 各選択されたエッジについて処理
+    for (dagPath, comp) in selEdges:
+        meshFn = om.MFnMesh(dagPath)
+        edgeIter = om.MItMeshEdge(dagPath, comp)
+        while not edgeIter.isDone():
+            # エッジの両端の頂点IDおよび位置を取得
+            vtxId1 = edgeIter.vertexId(0)
+            vtxId2 = edgeIter.vertexId(1)
+            pos1 = meshFn.getPoint(vtxId1, om.MSpace.kWorld)
+            pos2 = meshFn.getPoint(vtxId2, om.MSpace.kWorld)
+            
+            # エッジの中点を計算
+            midpoint = (pos1 + pos2) * 0.5
+            
+            # エッジベクトルの算出
+            edgeVector = pos2 - pos1
+            
+            # エッジに隣接する面があれば、最初の面の法線からオフセット方向を決定
+            faceIds = edgeIter.getConnectedFaces()
+            if not faceIds:
+                edgeIter.next()
+                continue
+            faceId_init = faceIds[0]
+            faceNormal = meshFn.getPolygonNormal(faceId_init, om.MSpace.kWorld)
+            # オフセット方向は、面の法線とエッジベクトルのクロス積で求める（面内でエッジに垂直な方向）
+            offsetVec = faceNormal ^ edgeVector
+            try:
+                offsetDir = offsetVec.normal()
+            except Exception:
+                offsetDir = offsetVec
+            
+            # 中点からオフセット量 epsilon だけ正側と負側の候補点を生成
+            candidatePlus = midpoint + offsetDir * epsilon
+            candidateMinus = midpoint - offsetDir * epsilon
+
+            # 各候補点について、最も近い頂点を求める
+            closestPlus = findClosestVertex(meshFn, candidatePlus)
+            closestMinus = findClosestVertex(meshFn, candidateMinus)
+            
+            # ここで、制約点は頂点上にあるが、表現は面IDとバリセンター座標で行う。
+            # そのため、該当頂点の incident face を取得し、顔が三角形であれば、
+            # その頂点のバリセンター座標は一方のみが1となる一種のワンホット表現となる。
+            
+            if closestPlus is not None:
+                vertexFaces = meshFn.getVertexFaces(closestPlus)
+                if vertexFaces.length() > 0:
+                    # incident face のうち最初の face を選択
+                    faceId = vertexFaces[0]
+                    faceVerts = meshFn.getPolygonVertices(faceId)
+                    # ここでは面が三角形であると仮定
+                    if len(faceVerts) == 3:
+                        try:
+                            idx = faceVerts.index(closestPlus)
+                        except Exception:
+                            idx = 0
+                        # 頂点のインデックスに応じたバリセンター座標の割り当て
+                        if idx == 0:
+                            bary = (1.0, 0.0, 0.0)
+                        elif idx == 1:
+                            bary = (0.0, 1.0, 0.0)
+                        elif idx == 2:
+                            bary = (0.0, 0.0, 1.0)
+                        consPlus = {"faceId": faceId, "bary": bary, "value": 1.0, "weight": 1.0}
+                        constraints.append(consPlus)
+                    else:
+                        om.MGlobal.displayWarning("faceId %d は三角形ではありません" % faceId)
+                else:
+                    om.MGlobal.displayWarning("頂点 %d に incident face がありません" % closestPlus)
+            
+            if closestMinus is not None:
+                vertexFaces = meshFn.getVertexFaces(closestMinus)
+                if vertexFaces.length() > 0:
+                    faceId = vertexFaces[0]
+                    faceVerts = meshFn.getPolygonVertices(faceId)
+                    if len(faceVerts) == 3:
+                        try:
+                            idx = faceVerts.index(closestMinus)
+                        except Exception:
+                            idx = 0
+                        if idx == 0:
+                            bary = (1.0, 0.0, 0.0)
+                        elif idx == 1:
+                            bary = (0.0, 1.0, 0.0)
+                        elif idx == 2:
+                            bary = (0.0, 0.0, 1.0)
+                        consMinus = {"faceId": faceId, "bary": bary, "value": -1.0, "weight": 1.0}
+                        constraints.append(consMinus)
+                    else:
+                        om.MGlobal.displayWarning("faceId %d は三角形ではありません" % faceId)
+                else:
+                    om.MGlobal.displayWarning("頂点 %d に incident face がありません" % closestMinus)
+            
+            edgeIter.next()
+    return constraints
+
+# 実行例
+if __name__ == "__main__":
+    # オフセット量 epsilon はシーンスケールに合わせて調整（ここでは例として 0.05）
+    cons = generateConstraintsFromSelectedEdges(epsilon=0.05)
+    if cons:
+        om.MGlobal.displayInfo("生成された制約数: " + str(len(cons)))
+        for c in cons:
+            print(c)
